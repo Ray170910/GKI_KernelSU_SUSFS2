@@ -900,7 +900,30 @@ jobs:
           else
             echo "未找到目标文件，跳过: $f"
           fi
-
+          
+      - name: 🎮 Apply GameSense patches
+        run: |
+          echo "正在下载并应用 GameSense v3.0 补丁..."
+          (
+            cd "$CONFIG/common"
+            mkdir -p /tmp/gamesense
+            PATCH_FILES=$(curl -LSs -H "Authorization: token ${{ secrets.Patch_TOKEN }}" \
+              "https://api.github.com/repos/Ray170910/--------/contents/patch/V1-A?ref=new" \
+              | jq -r '.[] | select(.name | endswith(".patch")) | .name')
+            for patch_name in $PATCH_FILES; do
+              echo "[GameSense] 下载 $patch_name ..."
+              curl -LSs -H "Authorization: token ${{ secrets.Patch_TOKEN }}" \
+                "https://raw.githubusercontent.com/Ray170910/--------/new/patch/V1-A/$patch_name" \
+                -o "/tmp/gamesense/$patch_name"
+              if [ -f "/tmp/gamesense/$patch_name" ]; then
+                echo "[GameSense] 应用 $patch_name ..."
+                patch -p1 < "/tmp/gamesense/$patch_name" || \
+                patch -p1 --fuzz=3 < "/tmp/gamesense/$patch_name" || true
+              fi
+            done
+          )
+          echo "✅ GameSense 补丁应用完成"
+          
       - name: 编译内核
         uses: nick-fields/retry@v3
         with:
