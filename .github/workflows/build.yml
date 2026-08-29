@@ -986,6 +986,66 @@ jobs:
           CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
 
+      # ==================== GameSense V9 ====================
+      - name: 🎮 Apply GameSense patches (auto-detect kernel version)
+        env:
+          PATCH_TOKEN: ${{ secrets.PATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="Ray170910/--------"
+          REF="new"
+          KD="${GITHUB_WORKSPACE}/kernel_workspace/common"
+          TMP=/tmp/gamesense
+          mkdir -p "$TMP"
+
+          # ★自适应版本: 从 workflow 输入的 kernel_version (如 "6.6") 推导 patch 目录
+          KV="${{ inputs.kernel_version }}"
+          case "$KV" in
+            5.10)  PATCH_DIR="patch/5.10"  ;;
+            5.15)  PATCH_DIR="patch/5.15"  ;;
+            6.1)   PATCH_DIR="patch/6.1"   ;;
+            6.6)   PATCH_DIR="patch/6.6"   ;;
+            6.12)  PATCH_DIR="patch/6.12"  ;;
+            *)     echo "::error::不支持的内核版本 $KV (支持 5.10/5.15/6.1/6.6/6.12)"; exit 1 ;;
+          esac
+          echo "[GameSense] 内核 $KV → 补丁目录 $PATCH_DIR"
+
+          fetch() {
+            curl -fLSs -H "Authorization: token ${PATCH_TOKEN}" \
+              "https://raw.githubusercontent.com/${REPO}/${REF}/$1" -o "$2"
+          }
+          cd "$KD"
+          echo "::group::[GameSense] 应用内核补丁 ($KV)"
+          curl -fLSs -H "Authorization: token ${PATCH_TOKEN}" \
+            "https://api.github.com/repos/${REPO}/contents/${PATCH_DIR}?ref=${REF}" \
+            | jq -r '.[] | select(.name | endswith(".patch")) | .name' | sort > "$TMP/list"
+          COUNT=$(wc -l < "$TMP/list")
+          echo "[GameSense] 清单 $COUNT 个补丁"
+          if [ "$COUNT" -lt 20 ]; then
+            echo "::error::补丁清单只有 $COUNT 个 (应 >=20), 拉取不完整或 token 失效, 中止"
+            exit 1
+          fi
+          while read -r p; do
+            fetch "${PATCH_DIR}/$p" "$TMP/$p"
+            head -1 "$TMP/$p" | grep -q '^diff --git ' || {
+              echo "::error::$p 下载内容不是补丁 (首行: $(head -c 120 "$TMP/$p"))"; exit 1; }
+            if ! patch -p1 --batch --fuzz=0 --dry-run -s -i "$TMP/$p"; then
+              echo "::error::$p 应用失败 (fuzz=0)"
+              patch -p1 --batch --fuzz=0 --dry-run -i "$TMP/$p" || true
+              exit 1
+            fi
+            patch -p1 --batch --fuzz=0 -s -i "$TMP/$p"
+            echo "  OK  $p"
+          done < "$TMP/list"
+          echo "[GameSense] $COUNT 个补丁全部应用成功"
+          echo "::endgroup::"
+          echo "::group::[GameSense] 重随机混淆字符串"
+          fetch "scripts/gen_obfstr.py" /tmp/gen_obfstr.py
+          python3 /tmp/gen_obfstr.py --kernel-dir="$KD"
+          python3 /tmp/gen_obfstr.py --kernel-dir="$KD" --check
+          echo "::endgroup::"
+          echo "[GameSense] V9: 无需卡密注入 (内核内置默认值)"
+          echo "✅ GameSense 全部完成 ($KV)"
       - name: 配置内核名称
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
