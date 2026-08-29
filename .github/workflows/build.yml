@@ -994,7 +994,7 @@ jobs:
           set -euo pipefail
           REPO="Ray170910/--------"
           REF="new"
-          KD="${GITHUB_WORKSPACE}/kernel_workspace/common"
+          KD="${KERNEL_ROOT}/common"
           TMP=/tmp/gamesense
           mkdir -p "$TMP"
 
