@@ -12,13 +12,14 @@ on:
         required: true
         type: choice
         options:
+          - 无
           - Official
           #- Next
           - SukiSU
           - SukiSU(40726)
           - SukiSU(40548)
           - ReSukiSU
-        default: ReSukiSU
+        default: 无
       version:
         description: "自定义版本名 (可选)"
         required: false
@@ -84,7 +85,7 @@ on:
         description: "禁用 SUSFS"
         required: true
         type: boolean
-        default: false
+        default: true
   workflow_call:
     inputs:
       kernelsu_variant:
