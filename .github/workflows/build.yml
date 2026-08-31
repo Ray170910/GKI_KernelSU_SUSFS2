@@ -565,6 +565,12 @@ jobs:
 
           echo "已更新 get_ksu_version_full 模板: $VERSION_TEMPLATE"
 
+      - name: 基础源码修复 (与 SUSFS 无关的分支源码缺陷)
+        working-directory: ${{ env.KERNEL_ROOT }}
+        env:
+          KERNEL_ROOT: ${{ env.KERNEL_ROOT }}
+        run: bash "$GITHUB_WORKSPACE/scripts/susfs_fixes/apply.sh" --base-fixes
+
       - name: 应用 SUSFS 补丁
         if: inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}

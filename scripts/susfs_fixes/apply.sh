@@ -8,6 +8,24 @@
 # 工作目录：$KERNEL_ROOT（与原 step 的 working-directory 一致）
 set -eo pipefail
 
+# ── 基础源码修复模式 (build.yml 无条件步骤调用, 与 enable_susfs 无关) ──
+# 只修目标分支源码自带的缺陷, 不应用任何 SUSFS 补丁。
+# 背景: android12-5.10 / android13-5.15 的 2024-11 ASB 分支 mm/mmap.c 使用了
+# 6.4+ 才有的 vm_flags_clear(), 但同分支 mm.h 未回移该 helper —— 纯净构建
+# (无 KSU/SUSFS) 同样编译失败。原先修复藏在 enable_susfs 门控的步骤里,
+# 关 SUSFS 时被连带跳过, 故拆出本模式。grep 兜底: 无此调用则空跑。
+if [[ "${1:-}" == "--base-fixes" ]]; then
+  cd "$KERNEL_ROOT/common"
+  if grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
+    sed -i 's/vm_flags_clear(new_vma, VM_PAD_MASK);/new_vma->vm_flags \&= ~VM_PAD_MASK;/' ./mm/mmap.c
+    echo "[base-fixes] 已修复 mm/mmap.c: vm_flags_clear() → 直接位运算 (分支源码缺 helper)"
+  else
+    echo "[base-fixes] mm/mmap.c 无 vm_flags_clear 调用, 跳过"
+  fi
+  echo "[base-fixes] 完成"
+  exit 0
+fi
+
 echo "应用 SUSFS 补丁..."
 
 SUSFS_PATCH="50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch"
