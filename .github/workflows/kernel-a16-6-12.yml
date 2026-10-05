@@ -181,16 +181,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sub_level: "23"
-            os_patch_level: "2025-06"
-          - sub_level: "30"
-            os_patch_level: "2025-07"
-          - sub_level: "38"
-            os_patch_level: "2025-09"
-          - sub_level: "58"
-            os_patch_level: "2025-12"
-          # - sub_level: "X"
-          #   os_patch_level: "lts"
+          # - sub_level: "23"
+          # os_patch_level: "2025-06"
+          # - sub_level: "30"
+          # os_patch_level: "2025-07"
+          # - sub_level: "38"
+          # os_patch_level: "2025-09"
+          # - sub_level: "58"
+          # os_patch_level: "2025-12"
+          # # - sub_level: "X"
+          # #   os_patch_level: "lts"
+          # lts 头部持续滚动, build.yml pin 步骤自动拼 KMI tag android16-6.12.77_r00
+          - sub_level: "77"
+            os_patch_level: "lts"
     uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
