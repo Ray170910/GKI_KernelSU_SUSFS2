@@ -22,6 +22,32 @@ list_untracked_rej() {
     <(list_upstream_rej | sort)
 }
 
+# ── 基础源码修复模式 (build.yml 无条件步骤调用, 与 enable_susfs 无关) ──
+# 只修目标分支源码自带的缺陷, 不应用任何 SUSFS 补丁。
+# 背景: android12-5.10 / android13-5.15 的 2024-11 ASB 分支 mm/mmap.c 使用了
+# 6.4+ 才有的 vm_flags_clear(), 但同分支 mm.h 未回移该 helper —— 纯净构建
+# (无 KSU/SUSFS) 同样编译失败。原先修复只在 enable_susfs 门控的主流程里,
+# 关 SUSFS 时被连带跳过, 故拆出本模式。grep 兜底: 无此调用则空跑。
+# ★修正: android15-6.6-92 起 vm_flags 已 const 化且 mm.h 自带 vm_flags_clear
+# helper (const 化与 accessor 是同一组提交)——此分支的 vm_flags_clear() 调用
+# 是合法的, 不能改写成直接位运算 (对 const 成员赋值直接编译失败)。
+# 故先探测 helper 是否存在, 缺失才降级改写。
+if [[ "${1:-}" == "--base-fixes" ]]; then
+  cd "$KERNEL_ROOT/common"
+  if grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
+    if grep -q 'vm_flags_clear' ./include/linux/mm.h; then
+      echo "[base-fixes] mm/mmap.c: 分支自带 vm_flags_clear helper (vm_flags 已 const 化), 保留原调用"
+    else
+      sed -i 's/vm_flags_clear(new_vma, VM_PAD_MASK);/new_vma->vm_flags \&= ~VM_PAD_MASK;/' ./mm/mmap.c
+      echo "[base-fixes] 已修复 mm/mmap.c: vm_flags_clear() → 直接位运算 (分支源码缺 helper)"
+    fi
+  else
+    echo "[base-fixes] mm/mmap.c 无 vm_flags_clear 调用, 跳过"
+  fi
+  echo "[base-fixes] 完成"
+  exit 0
+fi
+
 echo "应用 SUSFS 补丁..."
 
 SUSFS_PATCH="50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch"
