@@ -451,6 +451,16 @@ if [[ "$ANDROID_VERSION" == "android16" && "$KERNEL_VERSION" == "6.12" ]]; then
     fi
   fi
 
+  # susfs.c: 部分配置 (如 5.10 老树) 下 susfs_switch_to_ksu_domain /
+  # susfs_restore_creds 无调用者, -Werror=unused-function 打挂
+  # (run 41369855343)。标 __maybe_unused, 幂等。
+  if [ -f fs/susfs.c ]; then
+    for fn in susfs_switch_to_ksu_domain susfs_restore_creds; do
+      grep -q "__maybe_unused.*$fn" fs/susfs.c || \
+        sed -i "s/\\bstatic\\b\\(.* $fn\\)/__maybe_unused static\\1/" fs/susfs.c
+    done
+  fi
+
   # 固定旧版 SukiSU 在 6.12 上会重复定义 setresuid hook
   SETUID_HOOK="$KERNEL_ROOT/common/drivers/kernelsu/setuid_hook.c"
   if [[ -n "$LEGACY_SUKISU_CONFIG" && -f "$SETUID_HOOK" ]] \
