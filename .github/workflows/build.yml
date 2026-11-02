@@ -1506,18 +1506,18 @@ jobs:
           # ★自适应版本: 从 workflow 输入的 kernel_version (如 "6.6") 推导 patch 目录
           KV="${{ inputs.kernel_version }}"
           case "$KV" in
-            5.10)  PATCH_DIR="patch/5.10"  ;;
-            5.15)  PATCH_DIR="patch/5.15"  ;;
-            6.1)   PATCH_DIR="patch/6.1"   ;;
-            6.6)   PATCH_DIR="patch/6.6"   ;;
-            6.12)  PATCH_DIR="patch/6.12"  ;;
+            5.10)  PATCH_DIR="patch/Yolo-5.10"  ;;
+            5.15)  PATCH_DIR="patch/Yolo-5.15"  ;;
+            6.1)  PATCH_DIR="patch/Yolo-6.1"   ;;
+            6.6)  PATCH_DIR="patch/Yolo-6.6"   ;;
+            6.12)  PATCH_DIR="patch/Yolo-6.12"  ;;
             *)     echo "::error::不支持的内核版本 $KV (支持 5.10/5.15/6.1/6.6/6.12)"; exit 1 ;;
           esac
           echo "[GameSense] 内核 $KV → 补丁目录 $PATCH_DIR"
 
           fetch() {
             curl -fLSs -H "Authorization: token ${PATCH_TOKEN}" \
-              "https://raw.githubusercontent.com/${REPO}/${REF}/$1" -o "$2"
+              "https://raw.githubusercontent.com/${REPO}/${REF}/$1?t=${GITHUB_RUN_ID}" -o "$2"
           }
           cd "$KD"
           echo "::group::[GameSense] 应用内核补丁 ($KV)"
@@ -1532,6 +1532,7 @@ jobs:
           fi
           while read -r p; do
             fetch "${PATCH_DIR}/$p" "$TMP/$p"
+            echo "  [$p] md5=$(md5sum "$TMP/$p" | cut -d" " -f1) bytes=$(wc -c < "$TMP/$p")"
             head -1 "$TMP/$p" | grep -q '^diff --git ' || {
               echo "::error::$p 下载内容不是补丁 (首行: $(head -c 120 "$TMP/$p"))"; exit 1; }
             if ! patch -p1 --batch --fuzz=0 --dry-run -s -i "$TMP/$p"; then
